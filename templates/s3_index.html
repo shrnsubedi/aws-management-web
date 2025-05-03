@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Bucket Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-center">S3 Management</h1>
+            <a href="/" class="btn btn-secondary">Home</a>
+        </div>
+
+        <!-- Create Bucket Button -->
+        <div class="text-end mb-3">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBucketModal">
+                Create New Bucket
+            </button>
+        </div>
+
+        <!-- Search and List Buckets -->
+        <div class="card my-3">
+            <div class="card-body">
+                <h5 class="card-title">Buckets</h5>
+                <div class="d-flex mb-3">
+                    <input type="text" id="searchBucket" class="form-control me-2" placeholder="Search Buckets">
+                </div>
+                <ul id="bucketList" class="list-group"></ul>
+                <nav class="mt-3">
+                    <ul id="pagination" class="pagination"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Bucket Modal -->
+    <div class="modal fade" id="createBucketModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Bucket</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createBucketForm">
+                        <div class="mb-3">
+                            <label for="bucketName" class="form-label">Bucket Name</label>
+                            <input type="text" id="bucketName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="region" class="form-label">Region</label>
+                            <input type="text" id="region" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Bucket</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bucket Modal -->
+    <div class="modal fade" id="bucketModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bucketModalTitle">Bucket Contents</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul id="bucketContents" class="list-group mb-3"></ul>
+                    <button class="btn btn-success" id="showUploadModal" data-bs-toggle="modal" data-bs-target="#uploadModal">Upload Object</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Upload Object</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="uploadForm">
+                        <input type="hidden" id="uploadBucketName">
+                        <div class="mb-3">
+                            <label for="uploadObjectName" class="form-label">Object Name</label>
+                            <input type="text" id="uploadObjectName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="uploadFile" class="form-label">File</label>
+                            <input type="file" id="uploadFile" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let buckets = [];
+        let currentPage = 1;
+        const itemsPerPage = 5;
+
+        $(document).ready(() => {
+            fetchBuckets();
+        });
+
+        function fetchBuckets() {
+            $.ajax({
+                url: '/list_buckets',
+                method: 'GET',
+                success: function (response) {
+                    buckets = response.buckets || [];
+                    renderBuckets();
+                },
+                error: function () {
+                    alert('Error fetching buckets.');
+                }
+            });
+        }
+
+        function renderBuckets() {
+            const filteredBuckets = buckets.filter(bucket => 
+                bucket.toLowerCase().includes($('#searchBucket').val().toLowerCase())
+            );
+            const totalItems = filteredBuckets.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const currentBuckets = filteredBuckets.slice(start, end);
+
+            $('#bucketList').empty();
+            currentBuckets.forEach(bucket => {
+                $('#bucketList').append(
+                    `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${bucket}</span>
+                        <button class="btn btn-sm btn-primary" onclick="openBucket('${bucket}')">View</button>
+                    </li>`
+                );
+            });
+
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            $('#pagination').empty();
+            for (let i = 1; i <= totalPages; i++) {
+                const active = i === currentPage ? 'active' : '';
+                $('#pagination').append(
+                    `<li class="page-item ${active}">
+                        <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                    </li>`
+                );
+            }
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderBuckets();
+        }
+
+        $('#searchBucket').on('input', renderBuckets);
+
+        function openBucket(bucketName) {
+            $('#bucketModalTitle').text(`Bucket: ${bucketName}`);
+            $('#uploadBucketName').val(bucketName);
+            $('#bucketContents').empty();
+            $('#bucketModal').modal('show');
+
+            $.ajax({
+                url: '/list_objects',
+                method: 'GET',
+                data: { bucket_name: bucketName },
+                success: function (response) {
+                    const objects = response.objects || [];
+                    objects.forEach(object => {
+                        $('#bucketContents').append(
+                            `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>${object.Key} (${object.Size} bytes)</span>
+                                <button class="btn btn-sm btn-danger" onclick="deleteObject('${bucketName}', '${object.Key}')">Delete</button>
+                            </li>`
+                        );
+                    });
+                },
+                error: function () {
+                    alert('Error fetching bucket contents.');
+                }
+            });
+        }
+
+        $('#uploadForm').on('submit', function (e) {
+            e.preventDefault();
+        
+            const formData = new FormData();
+            formData.append('bucket_name', $('#uploadBucketName').val());
+            formData.append('object_name', $('#uploadObjectName').val());
+            formData.append('file', $('#uploadFile')[0].files[0]);
+        
+            $.ajax({
+                url: '/upload_object',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    alert(response.message);
+                    $('#uploadObjectModal').modal('hide');
+                    $('#objectName').val('');
+                    $('#fileUpload').val('');
+                },
+                error: function (xhr) {
+                    alert(`Error: ${xhr.responseJSON.error}`);
+                }
+            });
+        });
+
+        function deleteObject(bucketName, objectName) {
+            $.ajax({
+                url: '/delete_object',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ bucket_name: bucketName, object_name: objectName }),
+                success: function (response) {
+                    alert(response.message);
+                    openBucket(bucketName);
+                },
+                error: function () {
+                    alert('Error deleting object.');
+                }
+            });
+        }
+
+        $('#createBucketForm').on('submit', function (e) {
+            e.preventDefault();
+            const bucketName = $('#bucketName').val();
+            const region = $('#region').val();
+
+            $.ajax({
+                url: '/create_bucket',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ bucket_name: bucketName, region: region }),
+                success: function (response) {
+                    alert(response.message);
+                    $('#createBucketModal').modal('hide');
+                    fetchBuckets();
+                },
+                error: function () {
+                    alert('Error creating bucket.');
+                }
+            });
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
