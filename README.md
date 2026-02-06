@@ -1,5 +1,4 @@
 # ☁️ AWS EC2 Management Dashboard (Flask App)
-Erasmus Mundus Master in Green Networking and Cloud Computing (Module: Cloud Services)
 
 This is a Flask-based web application designed to interface with AWS services, specifically EC2. It provides a lightweight dashboard for interacting with your AWS environment via the AWS SDK (Boto3), offering operations like listing regions and potential EC2 instance management.
 
